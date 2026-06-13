@@ -1,5 +1,3 @@
--- example with tabs and components
-
 -- load builder
 local Builder = loadstring(game:HttpGet("https://raw.githubusercontent.com/pidaraks1488/moonware/refs/heads/main/src/builder.lua"))()
 
@@ -158,25 +156,5 @@ themeSection:Dropdown("Preset", window:GetThemes(), "Black", function(value)
 	window:SetTheme(value)
 	print("Theme:", value)
 end, 1)
-
-themeSection:Button("Black theme", function()
-	window:SetTheme("Black")
-end, 2)
-
-themeSection:Button("Purple theme", function()
-	window:SetTheme("Purple")
-end, 3)
-
-themeSection:Button("White theme", function()
-	window:SetTheme("White")
-end, 4)
-
-themeSection:Button("Candy theme", function()
-	window:SetTheme("Candy")
-end, 5)
-
-themeSection:Button("Ocean theme", function()
-	window:SetTheme("Ocean")
-end, 6)
 
 return window
