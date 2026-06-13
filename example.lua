@@ -23,6 +23,38 @@ local window = Builder.new({
 	ConfirmNoText = "No",
 	Width = 600,
 	Height = 360,
+	Themes = {
+		Ocean = {
+			Background = Color3.fromRGB(13, 22, 30),
+			Panel = Color3.fromRGB(18, 31, 42),
+			PanelLight = Color3.fromRGB(25, 42, 56),
+			PanelHover = Color3.fromRGB(34, 56, 74),
+			Text = Color3.fromRGB(235, 247, 255),
+			Muted = Color3.fromRGB(139, 166, 184),
+			Stroke = Color3.fromRGB(45, 72, 91),
+			SoftStroke = Color3.fromRGB(36, 58, 74),
+			Accent = Color3.fromRGB(72, 190, 235),
+			AccentDark = Color3.fromRGB(38, 124, 158),
+			Good = Color3.fromRGB(112, 220, 154),
+			Bad = Color3.fromRGB(232, 103, 116),
+		},
+	},
+})
+
+-- custom theme
+window:RegisterTheme("Candy", {
+	Background = Color3.fromRGB(28, 20, 28),
+	Panel = Color3.fromRGB(39, 27, 39),
+	PanelLight = Color3.fromRGB(51, 36, 52),
+	PanelHover = Color3.fromRGB(67, 45, 68),
+	Text = Color3.fromRGB(255, 244, 252),
+	Muted = Color3.fromRGB(190, 150, 180),
+	Stroke = Color3.fromRGB(79, 54, 80),
+	SoftStroke = Color3.fromRGB(66, 45, 68),
+	Accent = Color3.fromRGB(255, 118, 190),
+	AccentDark = Color3.fromRGB(177, 62, 124),
+	Good = Color3.fromRGB(112, 220, 154),
+	Bad = Color3.fromRGB(232, 103, 116),
 })
 
 -- script values
@@ -41,6 +73,7 @@ local state = {
 local main = window:CreateTab("Main", "lucide-home")
 local visuals = window:CreateTab("Visuals", "lucide-eye")
 local settings = window:CreateTab("Settings", "lucide-settings")
+local themes = window:CreateTab("Themes", "lucide-palette")
 
 -- combat controls
 local combat = main:Section("Combat")
@@ -118,5 +151,32 @@ end, 3)
 ui:Button("Destroy GUI", function()
 	window:Destroy()
 end, 4)
+
+-- theme controls
+local themeSection = themes:Section("Theme")
+themeSection:Dropdown("Preset", window:GetThemes(), "Black", function(value)
+	window:SetTheme(value)
+	print("Theme:", value)
+end, 1)
+
+themeSection:Button("Black theme", function()
+	window:SetTheme("Black")
+end, 2)
+
+themeSection:Button("Purple theme", function()
+	window:SetTheme("Purple")
+end, 3)
+
+themeSection:Button("White theme", function()
+	window:SetTheme("White")
+end, 4)
+
+themeSection:Button("Candy theme", function()
+	window:SetTheme("Candy")
+end, 5)
+
+themeSection:Button("Ocean theme", function()
+	window:SetTheme("Ocean")
+end, 6)
 
 return window
