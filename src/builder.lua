@@ -971,7 +971,9 @@ function Builder:CreateTab(name, icon)
 	page.CanvasSize = UDim2.fromOffset(0, 0)
 	page.ScrollBarImageColor3 = THEME.Accent
 	page.ScrollBarThickness = 3
+	page.ScrollBarImageTransparency = 0
 	page:SetAttribute("OpenScrollBarThickness", page.ScrollBarThickness)
+	page:SetAttribute("OpenScrollBarTransparency", page.ScrollBarImageTransparency)
 	page.Size = UDim2.fromScale(1, 1)
 	page.ZIndex = 13
 	page.Visible = false
@@ -983,7 +985,7 @@ function Builder:CreateTab(name, icon)
 	pageGroup.BorderSizePixel = 0
 	pageGroup.GroupTransparency = 0
 	pageGroup.Position = UDim2.fromOffset(0, 0)
-	pageGroup.Size = UDim2.new(1, 0, 0, 0)
+	pageGroup.Size = UDim2.new(1, -12, 0, 0)
 	pageGroup.ZIndex = 13
 	pageGroup.Parent = page
 
@@ -1000,7 +1002,7 @@ function Builder:CreateTab(name, icon)
 
 	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		page.CanvasSize = UDim2.fromOffset(0, layout.AbsoluteContentSize.Y + 8)
-		pageGroup.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 8)
+		pageGroup.Size = UDim2.new(1, -12, 0, layout.AbsoluteContentSize.Y + 8)
 	end)
 
 	tab.Button = button
@@ -1010,10 +1012,20 @@ function Builder:CreateTab(name, icon)
 	tab.Group = pageGroup
 	tab.Layout = layout
 
-	local function setPageState(targetTab, active)
+	local function setPageState(targetTab, active, animated)
 		targetTab.Page.Active = active
 		targetTab.Page.ScrollingEnabled = active
-		targetTab.Page.ScrollBarThickness = active and (targetTab.Page:GetAttribute("OpenScrollBarThickness") or 3) or 0
+		targetTab.Page.ScrollBarThickness = targetTab.Page:GetAttribute("OpenScrollBarThickness") or 3
+
+		local openTransparency = targetTab.Page:GetAttribute("OpenScrollBarTransparency") or 0
+		local targetTransparency = active and openTransparency or 1
+		if animated then
+			tween(targetTab.Page, TweenInfo.new(0.14, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+				ScrollBarImageTransparency = targetTransparency,
+			})
+		else
+			targetTab.Page.ScrollBarImageTransparency = targetTransparency
+		end
 	end
 
 	function tab:Select(force)
@@ -1038,7 +1050,7 @@ function Builder:CreateTab(name, icon)
 			other.Button.BackgroundColor3 = THEME.PanelLight
 			other.Icon.ImageColor3 = THEME.Muted
 			other.Label.TextColor3 = THEME.Muted
-			setPageState(other, false)
+			setPageState(other, false, false)
 			if other ~= tab and other ~= previousTab then
 				other.Page.Visible = false
 				other.Group.Position = UDim2.fromOffset(0, 0)
@@ -1054,7 +1066,7 @@ function Builder:CreateTab(name, icon)
 			if animation == "None" then
 				previousPage.Visible = false
 			elseif previousGroup then
-				setPageState(previousTab, false)
+				setPageState(previousTab, false, true)
 				tween(previousGroup, TweenInfo.new(duration * 0.7, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 					GroupTransparency = 1,
 				})
@@ -1073,7 +1085,7 @@ function Builder:CreateTab(name, icon)
 		end
 
 		page.Visible = true
-		setPageState(tab, animation == "None")
+		setPageState(tab, animation == "None", false)
 		if pageGroup then
 			local scale = pageGroup:FindFirstChild("TabScale")
 			if animation == "Fade" then
@@ -1112,7 +1124,7 @@ function Builder:CreateTab(name, icon)
 		if animation ~= "None" then
 			task.delay(duration, function()
 				if self.Gui.TabAnimationId == animationId and self.Gui.CurrentTab == tab then
-					setPageState(tab, true)
+					setPageState(tab, true, true)
 				end
 			end)
 		end
