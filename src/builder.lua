@@ -25,6 +25,79 @@ local THEME = {
 	Bad = Color3.fromRGB(232, 103, 116),
 }
 
+local THEME_PRESETS = {
+	Black = {
+		Background = Color3.fromRGB(17, 18, 21),
+		Panel = Color3.fromRGB(24, 26, 30),
+		PanelLight = Color3.fromRGB(31, 34, 39),
+		PanelHover = Color3.fromRGB(39, 43, 49),
+		Text = Color3.fromRGB(244, 244, 242),
+		Muted = Color3.fromRGB(150, 153, 158),
+		Stroke = Color3.fromRGB(50, 54, 61),
+		SoftStroke = Color3.fromRGB(39, 43, 50),
+		Accent = Color3.fromRGB(88, 214, 190),
+		AccentDark = Color3.fromRGB(43, 140, 126),
+		Good = Color3.fromRGB(112, 220, 154),
+		Bad = Color3.fromRGB(232, 103, 116),
+	},
+	Purple = {
+		Background = Color3.fromRGB(20, 18, 28),
+		Panel = Color3.fromRGB(29, 25, 41),
+		PanelLight = Color3.fromRGB(39, 33, 55),
+		PanelHover = Color3.fromRGB(51, 42, 73),
+		Text = Color3.fromRGB(248, 245, 255),
+		Muted = Color3.fromRGB(174, 166, 194),
+		Stroke = Color3.fromRGB(68, 58, 91),
+		SoftStroke = Color3.fromRGB(56, 48, 75),
+		Accent = Color3.fromRGB(174, 119, 255),
+		AccentDark = Color3.fromRGB(120, 75, 190),
+		Good = Color3.fromRGB(112, 220, 154),
+		Bad = Color3.fromRGB(232, 103, 116),
+	},
+	White = {
+		Background = Color3.fromRGB(238, 240, 243),
+		Panel = Color3.fromRGB(226, 229, 234),
+		PanelLight = Color3.fromRGB(216, 220, 228),
+		PanelHover = Color3.fromRGB(204, 210, 220),
+		Text = Color3.fromRGB(24, 27, 32),
+		Muted = Color3.fromRGB(95, 101, 112),
+		Stroke = Color3.fromRGB(188, 194, 204),
+		SoftStroke = Color3.fromRGB(198, 204, 214),
+		Accent = Color3.fromRGB(42, 150, 220),
+		AccentDark = Color3.fromRGB(26, 104, 158),
+		Good = Color3.fromRGB(40, 170, 95),
+		Bad = Color3.fromRGB(218, 80, 94),
+	},
+	Green = {
+		Background = Color3.fromRGB(15, 22, 19),
+		Panel = Color3.fromRGB(21, 32, 27),
+		PanelLight = Color3.fromRGB(29, 43, 36),
+		PanelHover = Color3.fromRGB(39, 57, 48),
+		Text = Color3.fromRGB(239, 248, 243),
+		Muted = Color3.fromRGB(147, 170, 157),
+		Stroke = Color3.fromRGB(45, 68, 56),
+		SoftStroke = Color3.fromRGB(37, 56, 47),
+		Accent = Color3.fromRGB(91, 220, 150),
+		AccentDark = Color3.fromRGB(47, 145, 91),
+		Good = Color3.fromRGB(112, 220, 154),
+		Bad = Color3.fromRGB(232, 103, 116),
+	},
+	Red = {
+		Background = Color3.fromRGB(24, 17, 19),
+		Panel = Color3.fromRGB(34, 23, 27),
+		PanelLight = Color3.fromRGB(45, 30, 36),
+		PanelHover = Color3.fromRGB(61, 39, 47),
+		Text = Color3.fromRGB(255, 244, 246),
+		Muted = Color3.fromRGB(183, 151, 157),
+		Stroke = Color3.fromRGB(77, 48, 57),
+		SoftStroke = Color3.fromRGB(62, 40, 47),
+		Accent = Color3.fromRGB(235, 91, 112),
+		AccentDark = Color3.fromRGB(166, 50, 68),
+		Good = Color3.fromRGB(112, 220, 154),
+		Bad = Color3.fromRGB(235, 91, 112),
+	},
+}
+
 local ICON_SOURCE = "https://raw.githubusercontent.com/pidaraks1488/moonware/refs/heads/main/src/Icons.lua"
 
 local ICON_KEYS = {
@@ -257,6 +330,14 @@ local function normalizeTabAnimation(animation, fallback)
 	return fallback or "Fade"
 end
 
+local function copyTheme(theme)
+	local copy = {}
+	for key, value in pairs(theme) do
+		copy[key] = value
+	end
+	return copy
+end
+
 function Builder.new(config)
 	config = config or {}
 
@@ -282,6 +363,15 @@ function Builder.new(config)
 	self.ConfirmMessage = config.ConfirmMessage or "Are you sure you want to unload this script?"
 	self.ConfirmYesText = config.ConfirmYesText or "Yes"
 	self.ConfirmNoText = config.ConfirmNoText or "No"
+	self.ThemePresets = {}
+	for name, theme in pairs(THEME_PRESETS) do
+		self.ThemePresets[name] = copyTheme(theme)
+	end
+	if config.Themes then
+		for name, theme in pairs(config.Themes) do
+			self.ThemePresets[name] = copyTheme(theme)
+		end
+	end
 	self.IconKeys = {}
 
 	for tabName, iconKey in pairs(ICON_KEYS) do
@@ -446,6 +536,9 @@ function Builder.new(config)
 	end)
 
 	self:MakeDraggable(titleBar)
+	if config.Theme then
+		self:SetTheme(config.Theme)
+	end
 	return self
 end
 
@@ -560,6 +653,95 @@ function Builder:SetTabAnimation(animation, enabled, duration)
 	if duration then
 		self.TabAnimationDuration = duration
 	end
+end
+
+function Builder:GetThemes()
+	local themes = {}
+	for name in pairs(self.ThemePresets or THEME_PRESETS) do
+		table.insert(themes, name)
+	end
+	table.sort(themes)
+	return themes
+end
+
+function Builder:GetTheme()
+	return copyTheme(THEME)
+end
+
+function Builder:RegisterTheme(name, theme, apply)
+	if type(name) ~= "string" or type(theme) ~= "table" then
+		return false
+	end
+
+	self.ThemePresets = self.ThemePresets or {}
+	self.ThemePresets[name] = copyTheme(theme)
+
+	if apply then
+		self:SetTheme(name)
+	end
+
+	return true
+end
+
+function Builder:SetTheme(theme)
+	local presets = self.ThemePresets or THEME_PRESETS
+	local preset = type(theme) == "string" and presets[theme] or theme
+	if type(preset) ~= "table" then
+		return false
+	end
+
+	local previous = {}
+	for key, value in pairs(THEME) do
+		previous[key] = value
+	end
+
+	for key, value in pairs(preset) do
+		if THEME[key] ~= nil then
+			THEME[key] = value
+		end
+	end
+
+	local function remapColor(color)
+		for key, oldColor in pairs(previous) do
+			if color == oldColor and THEME[key] then
+				return THEME[key]
+			end
+		end
+		return color
+	end
+
+	if self.Root then
+		self.Root.BackgroundColor3 = THEME.Background
+	end
+	if self.Sidebar then
+		self.Sidebar.BackgroundColor3 = THEME.Panel
+	end
+
+	for _, object in ipairs(self.Gui:GetDescendants()) do
+		if object:IsA("GuiObject") then
+			object.BackgroundColor3 = remapColor(object.BackgroundColor3)
+			if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+				object.TextColor3 = remapColor(object.TextColor3)
+				if object:IsA("TextBox") then
+					object.PlaceholderColor3 = remapColor(object.PlaceholderColor3)
+				end
+			end
+			if object:IsA("ImageLabel") or object:IsA("ImageButton") then
+				object.ImageColor3 = remapColor(object.ImageColor3)
+			end
+			if object:IsA("ScrollingFrame") then
+				object.ScrollBarImageColor3 = THEME.Accent
+			end
+		elseif object:IsA("UIStroke") then
+			object.Color = remapColor(object.Color)
+		end
+	end
+
+	if self.CurrentTab then
+		self.CurrentTab:Select(true)
+	end
+
+	return true
 end
 
 function Builder:ShowConfirmClose()
@@ -789,6 +971,7 @@ function Builder:CreateTab(name, icon)
 	page.CanvasSize = UDim2.fromOffset(0, 0)
 	page.ScrollBarImageColor3 = THEME.Accent
 	page.ScrollBarThickness = 3
+	page:SetAttribute("OpenScrollBarThickness", page.ScrollBarThickness)
 	page.Size = UDim2.fromScale(1, 1)
 	page.ZIndex = 13
 	page.Visible = false
@@ -827,8 +1010,14 @@ function Builder:CreateTab(name, icon)
 	tab.Group = pageGroup
 	tab.Layout = layout
 
-	function tab:Select()
-		if self.Gui.CurrentTab == tab then
+	local function setPageState(targetTab, active)
+		targetTab.Page.Active = active
+		targetTab.Page.ScrollingEnabled = active
+		targetTab.Page.ScrollBarThickness = active and (targetTab.Page:GetAttribute("OpenScrollBarThickness") or 3) or 0
+	end
+
+	function tab:Select(force)
+		if self.Gui.CurrentTab == tab and not force then
 			return
 		end
 
@@ -849,6 +1038,7 @@ function Builder:CreateTab(name, icon)
 			other.Button.BackgroundColor3 = THEME.PanelLight
 			other.Icon.ImageColor3 = THEME.Muted
 			other.Label.TextColor3 = THEME.Muted
+			setPageState(other, false)
 			if other ~= tab and other ~= previousTab then
 				other.Page.Visible = false
 				other.Group.Position = UDim2.fromOffset(0, 0)
@@ -864,6 +1054,7 @@ function Builder:CreateTab(name, icon)
 			if animation == "None" then
 				previousPage.Visible = false
 			elseif previousGroup then
+				setPageState(previousTab, false)
 				tween(previousGroup, TweenInfo.new(duration * 0.7, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 					GroupTransparency = 1,
 				})
@@ -882,6 +1073,7 @@ function Builder:CreateTab(name, icon)
 		end
 
 		page.Visible = true
+		setPageState(tab, animation == "None")
 		if pageGroup then
 			local scale = pageGroup:FindFirstChild("TabScale")
 			if animation == "Fade" then
@@ -915,6 +1107,14 @@ function Builder:CreateTab(name, icon)
 					scale.Scale = 1
 				end
 			end
+		end
+
+		if animation ~= "None" then
+			task.delay(duration, function()
+				if self.Gui.TabAnimationId == animationId and self.Gui.CurrentTab == tab then
+					setPageState(tab, true)
+				end
+			end)
 		end
 
 		button:SetAttribute("OpenBg", 0)
