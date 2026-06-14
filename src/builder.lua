@@ -398,6 +398,64 @@ local function copyTheme(theme)
 	return copy
 end
 
+local function sanitizeKey(text)
+	return tostring(text or "item"):gsub("[^%w_%-]+", "_"):gsub("_+", "_"):gsub("^_", ""):gsub("_$", "")
+end
+
+local function splitOrderOptions(order)
+	if type(order) == "table" then
+		return order.Order or order.order, order
+	end
+	return order, nil
+end
+
+local function encodeConfig(values)
+	local parts = {}
+	for key, value in pairs(values) do
+		local valueType = typeof(value)
+		if valueType == "boolean" or valueType == "number" or valueType == "string" then
+			table.insert(parts, HttpService:JSONEncode(key) .. ":" .. HttpService:JSONEncode(value))
+		elseif valueType == "Color3" then
+			table.insert(parts, HttpService:JSONEncode(key) .. ":" .. HttpService:JSONEncode({
+				__type = "Color3",
+				r = math.floor(value.R * 255 + 0.5),
+				g = math.floor(value.G * 255 + 0.5),
+				b = math.floor(value.B * 255 + 0.5),
+			}))
+		elseif valueType == "EnumItem" then
+			table.insert(parts, HttpService:JSONEncode(key) .. ":" .. HttpService:JSONEncode({
+				__type = "EnumItem",
+				enum = tostring(value.EnumType),
+				name = value.Name,
+			}))
+		end
+	end
+	table.sort(parts)
+	return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function decodeConfig(text)
+	local ok, decoded = pcall(function()
+		return HttpService:JSONDecode(text)
+	end)
+	if not ok or type(decoded) ~= "table" then
+		return nil
+	end
+
+	for key, value in pairs(decoded) do
+		if type(value) == "table" and value.__type == "Color3" then
+			decoded[key] = Color3.fromRGB(value.r or 255, value.g or 255, value.b or 255)
+		elseif type(value) == "table" and value.__type == "EnumItem" and type(value.enum) == "string" then
+			local enumName = value.enum:match("Enum%.(.+)")
+			if enumName and Enum[enumName] and value.name then
+				decoded[key] = Enum[enumName][value.name]
+			end
+		end
+	end
+
+	return decoded
+end
+
 function Builder.new(config)
 	config = config or {}
 
@@ -423,6 +481,16 @@ function Builder.new(config)
 	self.ConfirmMessage = config.ConfirmMessage or "Are you sure you want to unload this script?"
 	self.ConfirmYesText = config.ConfirmYesText or "Yes"
 	self.ConfirmNoText = config.ConfirmNoText or "No"
+	self.SidebarWidth = config.SidebarWidth or 144
+	self.TabHeight = config.TabHeight or 38
+	self.TabGap = config.TabGap or 8
+	self.TabScrollEnabled = config.TabScrollEnabled == true or config.TabScroll == true
+	self.MaxVisibleTabs = config.MaxVisibleTabs or config.TabLimit or 6
+	self.ConfigControls = {}
+	self.Config = config.Config or {}
+	self.ConfigEnabled = self.Config.Enabled == true
+	self.ConfigFolder = self.Config.Folder or "Moonware"
+	self.ConfigFile = self.Config.File or ((config.Title or "Builder") .. ".json")
 	self.ThemePresets = {}
 	for name, theme in pairs(THEME_PRESETS) do
 		self.ThemePresets[name] = copyTheme(theme)
@@ -558,31 +626,55 @@ function Builder.new(config)
 		self:SetOpen(false)
 	end)
 
-	local sidebar = Instance.new("Frame")
+	local sidebar = self.TabScrollEnabled and Instance.new("ScrollingFrame") or Instance.new("Frame")
 	sidebar.Name = "Sidebar"
 	sidebar.BackgroundColor3 = THEME.Panel
 	sidebar.BackgroundTransparency = 0
 	sidebar.BorderSizePixel = 0
-	sidebar.Position = UDim2.fromOffset(16, 70)
-	sidebar.Size = UDim2.new(0, 140, 1, -86)
+	sidebar.Position = UDim2.fromOffset(18, 70)
+	sidebar.Size = UDim2.new(0, self.SidebarWidth, 1, -88)
 	sidebar.ZIndex = 12
 	sidebar.Parent = root
 	sidebar:SetAttribute("ThemeBg", "Panel")
+	if sidebar:IsA("ScrollingFrame") then
+		sidebar.Active = true
+		sidebar.CanvasSize = UDim2.fromOffset(0, 0)
+		sidebar.ScrollBarImageColor3 = THEME.Accent
+		sidebar.ScrollBarImageTransparency = 0
+		sidebar.ScrollBarThickness = 3
+		sidebar.ScrollingDirection = Enum.ScrollingDirection.Y
+		sidebar:SetAttribute("OpenScrollBarThickness", sidebar.ScrollBarThickness)
+		sidebar:SetAttribute("OpenScrollBarTransparency", sidebar.ScrollBarImageTransparency)
+	end
 	corner(sidebar, 8)
 	stroke(sidebar, THEME.SoftStroke, 0.4, 1)
 	padding(sidebar, 8)
 
 	local tabList = Instance.new("UIListLayout")
-	tabList.Padding = UDim.new(0, 8)
+	tabList.Padding = UDim.new(0, self.TabGap)
 	tabList.SortOrder = Enum.SortOrder.LayoutOrder
 	tabList.Parent = sidebar
 	self.Sidebar = sidebar
+	self.TabList = tabList
+
+	local function updateSidebarSize()
+		local contentHeight = tabList.AbsoluteContentSize.Y + 16
+		if self.TabScrollEnabled then
+			local visibleTabs = math.max(self.MaxVisibleTabs or #self.Tabs, 1)
+			local maxHeight = (visibleTabs * self.TabHeight) + (math.max(visibleTabs - 1, 0) * self.TabGap) + 16
+			sidebar.Size = UDim2.new(0, self.SidebarWidth, 0, math.min(contentHeight, maxHeight))
+			sidebar.CanvasSize = UDim2.fromOffset(0, contentHeight)
+		end
+	end
+
+	tabList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateSidebarSize)
+	self.UpdateSidebarSize = updateSidebarSize
 
 	local pages = Instance.new("Frame")
 	pages.Name = "Pages"
 	pages.BackgroundTransparency = 1
-	pages.Position = UDim2.fromOffset(174, 70)
-	pages.Size = UDim2.new(1, -196, 1, -86)
+	pages.Position = UDim2.fromOffset(self.SidebarWidth + 40, 70)
+	pages.Size = UDim2.new(1, -(self.SidebarWidth + 62), 1, -88)
 	pages.ZIndex = 12
 	pages.Parent = root
 	self.Pages = pages
@@ -831,6 +923,105 @@ function Builder:SetTheme(theme)
 	return true
 end
 
+function Builder:GetConfigPath(name)
+	local fileName = name or self.ConfigFile or "config.json"
+	if not fileName:match("%.json$") then
+		fileName = fileName .. ".json"
+	end
+	return (self.ConfigFolder or "Moonware") .. "/" .. fileName
+end
+
+function Builder:RegisterConfigControl(flag, control)
+	if not flag or not control or not control.Get or not control.Set then
+		return control
+	end
+	self.ConfigControls[flag] = control
+	return control
+end
+
+function Builder:GetConfigValues()
+	local values = {}
+	for flag, control in pairs(self.ConfigControls or {}) do
+		local ok, value = pcall(control.Get)
+		if ok then
+			values[flag] = value
+		end
+	end
+	return values
+end
+
+function Builder:ApplyConfigValues(values)
+	if type(values) ~= "table" then
+		return false
+	end
+	for flag, value in pairs(values) do
+		local control = self.ConfigControls and self.ConfigControls[flag]
+		if control and control.Set then
+			pcall(control.Set, value)
+		end
+	end
+	return true
+end
+
+function Builder:SaveConfig(name)
+	if not self.ConfigEnabled then
+		return false, "Config support is disabled"
+	end
+	if type(writefile) ~= "function" then
+		return false, "writefile is not available"
+	end
+	if type(makefolder) == "function" then
+		pcall(makefolder, self.ConfigFolder or "Moonware")
+	end
+	local path = self:GetConfigPath(name)
+	local ok, err = pcall(writefile, path, encodeConfig(self:GetConfigValues()))
+	return ok, err
+end
+
+function Builder:LoadConfig(name)
+	if not self.ConfigEnabled then
+		return false, "Config support is disabled"
+	end
+	if type(readfile) ~= "function" then
+		return false, "readfile is not available"
+	end
+	local path = self:GetConfigPath(name)
+	if type(isfile) == "function" and not isfile(path) then
+		return false, "Config file does not exist"
+	end
+	local ok, content = pcall(readfile, path)
+	if not ok then
+		return false, content
+	end
+	local values = decodeConfig(content)
+	if not values then
+		return false, "Invalid config file"
+	end
+	self:ApplyConfigValues(values)
+	return true
+end
+
+function Builder:CreateConfigSection(tab, title)
+	if not tab or not tab.Section then
+		return nil
+	end
+	local section = tab:Section(title or "Config")
+	local defaultName = (self.ConfigFile or "config.json"):gsub("%.json$", "")
+	local configName = defaultName
+
+	section:Textbox("Config name", "config", defaultName, function(value)
+		configName = value ~= "" and value or defaultName
+	end)
+	section:Button("Save config", function()
+		self:SaveConfig(configName)
+	end)
+	section:Button("Load config", function()
+		self:LoadConfig(configName)
+	end)
+
+	return section
+end
+
 function Builder:ShowConfirmClose()
 	if self.ConfirmOpen then
 		return
@@ -1029,7 +1220,7 @@ function Builder:CreateTab(name, icon)
 	button.BackgroundTransparency = 1
 	button.BorderSizePixel = 0
 	button.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold)
-	button.Size = UDim2.new(1, 0, 0, 40)
+	button.Size = UDim2.new(1, 0, 0, self.TabHeight)
 	button.Text = ""
 	button.TextColor3 = THEME.Muted
 	button.TextSize = 13
@@ -1046,7 +1237,7 @@ function Builder:CreateTab(name, icon)
 	iconImage.Image = resolveIcon(icon) or resolveIcon(self.IconKeys[name]) or resolveIcon(ICON_KEYS.Main)
 	iconImage.ImageColor3 = THEME.Muted
 	iconImage.ImageTransparency = 0.04
-	iconImage.Position = UDim2.fromOffset(12, 11)
+	iconImage.Position = UDim2.fromOffset(12, math.floor((self.TabHeight - 18) / 2 + 0.5))
 	iconImage.Size = UDim2.fromOffset(18, 18)
 	iconImage.ZIndex = 14
 	iconImage.Parent = button
@@ -1237,6 +1428,10 @@ function Builder:CreateTab(name, icon)
 		tabLabel:SetAttribute("ThemeText", "Text")
 	end
 
+	if self.UpdateSidebarSize then
+		task.defer(self.UpdateSidebarSize)
+	end
+
 	button.MouseButton1Click:Connect(function()
 		tab:Select()
 	end)
@@ -1270,6 +1465,18 @@ function Builder:CreateTab(name, icon)
 		end)
 
 		local api = {}
+		local sectionKey = sanitizeKey(name) .. "." .. sanitizeKey(title)
+		local builder = self.Gui
+
+		local function registerControl(controlText, control, options)
+			if not builder.ConfigEnabled then
+				return control
+			end
+			local flag = options and (options.Flag or options.flag or options.Key or options.key)
+			flag = flag or (sectionKey .. "." .. sanitizeKey(controlText))
+			builder:RegisterConfigControl(flag, control)
+			return control
+		end
 
 		function api:Button(text, callback, order)
 			if type(callback) == "number" then
@@ -1320,6 +1527,8 @@ function Builder:CreateTab(name, icon)
 				order = callback
 				callback = nil
 			end
+			local configOptions
+			order, configOptions = splitOrderOptions(order)
 
 			local value = default == true
 
@@ -1385,7 +1594,7 @@ function Builder:CreateTab(name, icon)
 				task.defer(callback, value)
 			end
 
-			return { Set = set, Get = function() return value end }
+			return registerControl(text, { Set = set, Get = function() return value end }, configOptions)
 		end
 
 		function api:Slider(text, min, max, default, step, callback, order)
@@ -1396,6 +1605,8 @@ function Builder:CreateTab(name, icon)
 				order = callback
 				callback = nil
 			end
+			local configOptions
+			order, configOptions = splitOrderOptions(order)
 
 			step = step or 1
 			local value = math.clamp(default or min, min, max)
@@ -1478,7 +1689,7 @@ function Builder:CreateTab(name, icon)
 				task.defer(callback, value)
 			end
 
-			return {
+			return registerControl(text, {
 				Set = function(nextValue)
 					value = math.clamp(math.floor((nextValue / step) + 0.5) * step, min, max)
 					valueLabel.Text = formatNumber(value, step)
@@ -1492,7 +1703,7 @@ function Builder:CreateTab(name, icon)
 				Get = function()
 					return value
 				end,
-			}
+			}, configOptions)
 		end
 
 		function api:Keybind(text, defaultKey, callback, order)
@@ -1500,6 +1711,8 @@ function Builder:CreateTab(name, icon)
 				order = callback
 				callback = nil
 			end
+			local configOptions
+			order, configOptions = splitOrderOptions(order)
 
 			local selectedKey = defaultKey or Enum.KeyCode.F
 			local listening = false
@@ -1665,7 +1878,7 @@ function Builder:CreateTab(name, icon)
 				end
 			end)
 
-			return {
+			return registerControl(text, {
 				Set = function(key)
 					selectedKey = key
 					toggled = false
@@ -1679,7 +1892,7 @@ function Builder:CreateTab(name, icon)
 				GetMode = function()
 					return mode
 				end,
-			}
+			}, configOptions)
 		end
 
 		function api:Label(text, order)
@@ -1728,6 +1941,8 @@ function Builder:CreateTab(name, icon)
 				order = callback
 				callback = nil
 			end
+			local configOptions
+			order, configOptions = splitOrderOptions(order)
 
 			local row = Instance.new("Frame")
 			row.BackgroundColor3 = THEME.PanelLight
@@ -1780,7 +1995,7 @@ function Builder:CreateTab(name, icon)
 				task.defer(callback, box.Text)
 			end
 
-			return {
+			return registerControl(text, {
 				Set = function(value)
 					box.Text = tostring(value or "")
 					submit()
@@ -1788,7 +2003,7 @@ function Builder:CreateTab(name, icon)
 				Get = function()
 					return box.Text
 				end,
-			}
+			}, configOptions)
 		end
 
 		function api:Dropdown(text, options, default, callback, order)
@@ -1796,6 +2011,8 @@ function Builder:CreateTab(name, icon)
 				order = callback
 				callback = nil
 			end
+			local configOptions
+			order, configOptions = splitOrderOptions(order)
 
 			options = options or {}
 			local selected = default or options[1]
@@ -1916,13 +2133,13 @@ function Builder:CreateTab(name, icon)
 				task.defer(callback, selected)
 			end
 
-			return {
+			return registerControl(text, {
 				Set = set,
 				Get = function()
 					return selected
 				end,
 				SetOptions = rebuild,
-			}
+			}, configOptions)
 		end
 
 		function api:List(text, items, callback, order)
@@ -1930,6 +2147,8 @@ function Builder:CreateTab(name, icon)
 				order = callback
 				callback = nil
 			end
+			local configOptions
+			order, configOptions = splitOrderOptions(order)
 
 			items = items or {}
 			local itemButtons = {}
@@ -2018,14 +2237,14 @@ function Builder:CreateTab(name, icon)
 			holderLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshSize)
 			set(items)
 
-			return {
+			return registerControl(text, {
 				Add = add,
 				Clear = clear,
 				Set = set,
 				Get = function()
 					return items
 				end,
-			}
+			}, configOptions)
 		end
 
 		function api:ColorPicker(text, default, callback, order)
@@ -2033,6 +2252,8 @@ function Builder:CreateTab(name, icon)
 				order = callback
 				callback = nil
 			end
+			local configOptions
+			order, configOptions = splitOrderOptions(order)
 
 			local hue, saturation, value = Color3.toHSV(default or THEME.Accent)
 			local selected = Color3.fromHSV(hue, saturation, value)
@@ -2239,7 +2460,7 @@ function Builder:CreateTab(name, icon)
 				task.defer(callback, selected)
 			end
 
-			return {
+			return registerControl(text, {
 				Set = function(color)
 					hue, saturation, value = Color3.toHSV(color)
 					updateVisuals(true)
@@ -2247,13 +2468,16 @@ function Builder:CreateTab(name, icon)
 				Get = function()
 					return selected
 				end,
-			}
+			}, configOptions)
 		end
 
 		return api
 	end
 
 	table.insert(self.Tabs, tab)
+	if self.UpdateSidebarSize then
+		task.defer(self.UpdateSidebarSize)
+	end
 	if not self.CurrentTab then
 		tab:Select()
 	end
