@@ -324,6 +324,49 @@ local function sendMenuKeyNotification(parent, title, message, key, icon)
 	end)
 end
 
+local function setupAutoHideScrollBar(scroller, shownTransparency, hiddenTransparency, idleDelay)
+	shownTransparency = shownTransparency or 0
+	hiddenTransparency = hiddenTransparency or 1
+	idleDelay = idleDelay or 0.75
+
+	scroller:SetAttribute("OpenScrollBarTransparency", shownTransparency)
+	scroller:SetAttribute("HiddenScrollBarTransparency", hiddenTransparency)
+	scroller.ScrollBarImageTransparency = hiddenTransparency
+
+	local hideToken = 0
+	local lastPosition = scroller.CanvasPosition
+
+	local function show()
+		if scroller.ScrollingEnabled == false or scroller.Active == false then
+			return
+		end
+
+		hideToken += 1
+		local token = hideToken
+
+		tween(scroller, TweenInfo.new(0.12, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			ScrollBarImageTransparency = shownTransparency,
+		})
+
+		task.delay(idleDelay, function()
+			if token ~= hideToken or not scroller.Parent then
+				return
+			end
+			tween(scroller, TweenInfo.new(0.34, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+				ScrollBarImageTransparency = hiddenTransparency,
+			})
+		end)
+	end
+
+	scroller:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+		local currentPosition = scroller.CanvasPosition
+		if currentPosition ~= lastPosition then
+			lastPosition = currentPosition
+			show()
+		end
+	end)
+end
+
 local function corner(parent, radius)
 	local ui = Instance.new("UICorner")
 	ui.CornerRadius = UDim.new(0, radius or 8)
@@ -770,11 +813,10 @@ function Builder.new(config)
 		sidebar.Active = true
 		sidebar.CanvasSize = UDim2.fromOffset(0, 0)
 		sidebar.ScrollBarImageColor3 = THEME.Accent
-		sidebar.ScrollBarImageTransparency = 0
 		sidebar.ScrollBarThickness = 3
 		sidebar.ScrollingDirection = Enum.ScrollingDirection.Y
 		sidebar:SetAttribute("OpenScrollBarThickness", sidebar.ScrollBarThickness)
-		sidebar:SetAttribute("OpenScrollBarTransparency", sidebar.ScrollBarImageTransparency)
+		setupAutoHideScrollBar(sidebar)
 	end
 	corner(sidebar, 8)
 	stroke(sidebar, THEME.SoftStroke, 0.4, 1)
@@ -1405,9 +1447,8 @@ function Builder:CreateTab(name, icon)
 	page.CanvasSize = UDim2.fromOffset(0, 0)
 	page.ScrollBarImageColor3 = THEME.Accent
 	page.ScrollBarThickness = 3
-	page.ScrollBarImageTransparency = 0
 	page:SetAttribute("OpenScrollBarThickness", page.ScrollBarThickness)
-	page:SetAttribute("OpenScrollBarTransparency", page.ScrollBarImageTransparency)
+	setupAutoHideScrollBar(page)
 	page.Size = UDim2.fromScale(1, 1)
 	page.ZIndex = 13
 	page.Visible = false
@@ -1451,8 +1492,8 @@ function Builder:CreateTab(name, icon)
 		targetTab.Page.ScrollingEnabled = active
 		targetTab.Page.ScrollBarThickness = targetTab.Page:GetAttribute("OpenScrollBarThickness") or 3
 
-		local openTransparency = targetTab.Page:GetAttribute("OpenScrollBarTransparency") or 0
-		local targetTransparency = active and openTransparency or 1
+		local hiddenTransparency = targetTab.Page:GetAttribute("HiddenScrollBarTransparency") or 1
+		local targetTransparency = hiddenTransparency
 		if animated then
 			tween(targetTab.Page, TweenInfo.new(0.14, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 				ScrollBarImageTransparency = targetTransparency,
