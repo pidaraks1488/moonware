@@ -208,6 +208,15 @@ local function corner(parent, radius)
 	return ui
 end
 
+local function themeKeyForColor(color)
+	for key, value in pairs(THEME) do
+		if color == value then
+			return key
+		end
+	end
+	return nil
+end
+
 local function stroke(parent, color, transparency, thickness)
 	local ui = Instance.new("UIStroke")
 	ui.Color = color or Color3.fromRGB(255, 255, 255)
@@ -216,7 +225,52 @@ local function stroke(parent, color, transparency, thickness)
 	ui.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	ui.Parent = parent
 	ui:SetAttribute("OpenTransparency", ui.Transparency)
+	local key = themeKeyForColor(ui.Color)
+	if key then
+		ui:SetAttribute("ThemeStroke", key)
+	end
 	return ui
+end
+
+local function themeBg(object, key)
+	object:SetAttribute("ThemeBg", key)
+	object.BackgroundColor3 = THEME[key]
+	return object
+end
+
+local function themeText(object, key)
+	object:SetAttribute("ThemeText", key)
+	object.TextColor3 = THEME[key]
+	return object
+end
+
+local function themeImage(object, key)
+	object:SetAttribute("ThemeImage", key)
+	object.ImageColor3 = THEME[key]
+	return object
+end
+
+local function themeStroke(object, key)
+	object:SetAttribute("ThemeStroke", key)
+	object.Color = THEME[key]
+	return object
+end
+
+local function formatNumber(value, step)
+	local decimals = 0
+	local stepText = tostring(step or 1)
+	local dot = stepText:find("%.")
+
+	if dot then
+		decimals = #stepText - dot
+	end
+
+	local text = string.format("%." .. decimals .. "f", value)
+	if decimals > 0 then
+		text = text:gsub("0+$", ""):gsub("%.$", "")
+	end
+
+	return text
 end
 
 local function padding(parent, px)
@@ -260,6 +314,10 @@ local function makeLabel(parent, text, size, color, weight)
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.TextYAlignment = Enum.TextYAlignment.Center
 	label.Parent = parent
+	local key = themeKeyForColor(label.TextColor3)
+	if key then
+		label:SetAttribute("ThemeText", key)
+	end
 	return label
 end
 
@@ -278,6 +336,8 @@ local function makeIconButton(parent, text, xOffset)
 	button.TextSize = 14
 	button.ZIndex = 14
 	button.Parent = parent
+	button:SetAttribute("ThemeBg", "PanelLight")
+	button:SetAttribute("ThemeText", "Muted")
 	corner(button, 7)
 	return button
 end
@@ -460,6 +520,7 @@ function Builder.new(config)
 	root.Size = self.Size
 	root.ZIndex = 10
 	root.Parent = holder
+	root:SetAttribute("ThemeBg", "Background")
 	corner(root, 10)
 	self.RootShadow = shadow(root, 56, 0.68)
 	self.Root = root
@@ -506,6 +567,7 @@ function Builder.new(config)
 	sidebar.Size = UDim2.new(0, 140, 1, -86)
 	sidebar.ZIndex = 12
 	sidebar.Parent = root
+	sidebar:SetAttribute("ThemeBg", "Panel")
 	corner(sidebar, 8)
 	stroke(sidebar, THEME.SoftStroke, 0.4, 1)
 	padding(sidebar, 8)
@@ -719,21 +781,46 @@ function Builder:SetTheme(theme)
 
 	for _, object in ipairs(self.Gui:GetDescendants()) do
 		if object:IsA("GuiObject") then
-			object.BackgroundColor3 = remapColor(object.BackgroundColor3)
+			local bgKey = object:GetAttribute("ThemeBg")
+			if bgKey and THEME[bgKey] then
+				object.BackgroundColor3 = THEME[bgKey]
+			else
+				object.BackgroundColor3 = remapColor(object.BackgroundColor3)
+			end
 			if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
-				object.TextColor3 = remapColor(object.TextColor3)
+				local textKey = object:GetAttribute("ThemeText")
+				if textKey and THEME[textKey] then
+					object.TextColor3 = THEME[textKey]
+				else
+					object.TextColor3 = remapColor(object.TextColor3)
+				end
 				if object:IsA("TextBox") then
-					object.PlaceholderColor3 = remapColor(object.PlaceholderColor3)
+					local placeholderKey = object:GetAttribute("ThemePlaceholder")
+					if placeholderKey and THEME[placeholderKey] then
+						object.PlaceholderColor3 = THEME[placeholderKey]
+					else
+						object.PlaceholderColor3 = remapColor(object.PlaceholderColor3)
+					end
 				end
 			end
 			if object:IsA("ImageLabel") or object:IsA("ImageButton") then
-				object.ImageColor3 = remapColor(object.ImageColor3)
+				local imageKey = object:GetAttribute("ThemeImage")
+				if imageKey and THEME[imageKey] then
+					object.ImageColor3 = THEME[imageKey]
+				else
+					object.ImageColor3 = remapColor(object.ImageColor3)
+				end
 			end
 			if object:IsA("ScrollingFrame") then
 				object.ScrollBarImageColor3 = THEME.Accent
 			end
 		elseif object:IsA("UIStroke") then
-			object.Color = remapColor(object.Color)
+			local strokeKey = object:GetAttribute("ThemeStroke")
+			if strokeKey and THEME[strokeKey] then
+				object.Color = THEME[strokeKey]
+			else
+				object.Color = remapColor(object.Color)
+			end
 		end
 	end
 
@@ -768,6 +855,7 @@ function Builder:ShowConfirmClose()
 	overlay.Size = UDim2.fromOffset(353, 147)
 	overlay.ZIndex = 30
 	overlay.Parent = self.Gui
+	overlay:SetAttribute("ThemeBg", "Background")
 	corner(overlay, 10)
 	padding(overlay, 18)
 	local overlayShadow = shadow(overlay, 58, 0.62)
@@ -807,6 +895,8 @@ function Builder:ShowConfirmClose()
 	noButton.TextSize = 13
 	noButton.ZIndex = 32
 	noButton.Parent = buttons
+	noButton:SetAttribute("ThemeBg", "PanelLight")
+	noButton:SetAttribute("ThemeText", "Text")
 	corner(noButton, 7)
 
 	local yesButton = Instance.new("TextButton")
@@ -822,6 +912,8 @@ function Builder:ShowConfirmClose()
 	yesButton.TextSize = 13
 	yesButton.ZIndex = 32
 	yesButton.Parent = buttons
+	yesButton:SetAttribute("ThemeBg", "Bad")
+	yesButton:SetAttribute("ThemeText", "Text")
 	corner(yesButton, 7)
 
 	self.ConfirmOverlay = overlay
@@ -944,6 +1036,8 @@ function Builder:CreateTab(name, icon)
 	button.ZIndex = 13
 	button.Parent = self.Sidebar
 	button:SetAttribute("OpenBg", button.BackgroundTransparency)
+	button:SetAttribute("ThemeBg", "PanelLight")
+	button:SetAttribute("ThemeText", "Muted")
 	corner(button, 7)
 
 	local iconImage = Instance.new("ImageLabel")
@@ -957,6 +1051,7 @@ function Builder:CreateTab(name, icon)
 	iconImage.ZIndex = 14
 	iconImage.Parent = button
 	iconImage:SetAttribute("OpenImage", iconImage.ImageTransparency)
+	iconImage:SetAttribute("ThemeImage", "Muted")
 
 	local tabLabel = makeLabel(button, name, 13, THEME.Muted, Enum.FontWeight.SemiBold)
 	tabLabel.Position = UDim2.fromOffset(40, 0)
@@ -1050,6 +1145,9 @@ function Builder:CreateTab(name, icon)
 			other.Button.BackgroundColor3 = THEME.PanelLight
 			other.Icon.ImageColor3 = THEME.Muted
 			other.Label.TextColor3 = THEME.Muted
+			other.Button:SetAttribute("ThemeBg", "PanelLight")
+			other.Icon:SetAttribute("ThemeImage", "Muted")
+			other.Label:SetAttribute("ThemeText", "Muted")
 			setPageState(other, false, false)
 			if other ~= tab and other ~= previousTab then
 				other.Page.Visible = false
@@ -1134,6 +1232,9 @@ function Builder:CreateTab(name, icon)
 		button.BackgroundColor3 = THEME.PanelLight
 		iconImage.ImageColor3 = THEME.Accent
 		tabLabel.TextColor3 = THEME.Text
+		button:SetAttribute("ThemeBg", "PanelLight")
+		iconImage:SetAttribute("ThemeImage", "Accent")
+		tabLabel:SetAttribute("ThemeText", "Text")
 	end
 
 	button.MouseButton1Click:Connect(function()
@@ -1150,6 +1251,7 @@ function Builder:CreateTab(name, icon)
 		section.ZIndex = 14
 		section.Parent = pageGroup
 		section:SetAttribute("OpenBg", section.BackgroundTransparency)
+		section:SetAttribute("ThemeBg", "Panel")
 		corner(section, 8)
 		stroke(section, THEME.SoftStroke, 0.45, 1)
 		padding(section, 12)
@@ -1189,15 +1291,21 @@ function Builder:CreateTab(name, icon)
 			btn.Parent = section
 			applyOrder(btn, order)
 			btn:SetAttribute("OpenBg", btn.BackgroundTransparency)
+			btn:SetAttribute("ThemeBg", "PanelLight")
+			btn:SetAttribute("ThemeText", "Text")
 			corner(btn, 7)
 
 			btn.MouseEnter:Connect(function()
 				btn.BackgroundColor3 = THEME.PanelHover
 				btn.TextColor3 = THEME.Text
+				btn:SetAttribute("ThemeBg", "PanelHover")
+				btn:SetAttribute("ThemeText", "Text")
 			end)
 			btn.MouseLeave:Connect(function()
 				btn.BackgroundColor3 = THEME.PanelLight
 				btn.TextColor3 = THEME.Text
+				btn:SetAttribute("ThemeBg", "PanelLight")
+				btn:SetAttribute("ThemeText", "Text")
 			end)
 			btn.MouseButton1Click:Connect(function()
 				if callback then
@@ -1226,6 +1334,7 @@ function Builder:CreateTab(name, icon)
 			row.Parent = section
 			applyOrder(row, order)
 			row:SetAttribute("OpenBg", row.BackgroundTransparency)
+			row:SetAttribute("ThemeBg", "PanelLight")
 			corner(row, 7)
 
 			local label = makeLabel(row, text, 13, THEME.Text, Enum.FontWeight.Medium)
@@ -1241,6 +1350,7 @@ function Builder:CreateTab(name, icon)
 			knobBg.Size = UDim2.fromOffset(38, 20)
 			knobBg.ZIndex = 16
 			knobBg.Parent = row
+			knobBg:SetAttribute("ThemeBg", value and "Accent" or nil)
 			corner(knobBg, 10)
 
 			local knob = Instance.new("Frame")
@@ -1254,6 +1364,7 @@ function Builder:CreateTab(name, icon)
 
 			local function set(nextValue)
 				value = nextValue
+				knobBg:SetAttribute("ThemeBg", value and "Accent" or nil)
 				local toggleInfo = TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 				tween(knobBg, toggleInfo, {
 					BackgroundColor3 = value and THEME.Accent or Color3.fromRGB(70, 73, 78),
@@ -1299,6 +1410,7 @@ function Builder:CreateTab(name, icon)
 			row.Parent = section
 			applyOrder(row, order)
 			row:SetAttribute("OpenBg", row.BackgroundTransparency)
+			row:SetAttribute("ThemeBg", "PanelLight")
 			corner(row, 7)
 
 			local label = makeLabel(row, text, 13, THEME.Text, Enum.FontWeight.Medium)
@@ -1306,7 +1418,7 @@ function Builder:CreateTab(name, icon)
 			label.Size = UDim2.new(1, -72, 0, 24)
 			label.ZIndex = 16
 
-			local valueLabel = makeLabel(row, tostring(value), 12, THEME.Accent, Enum.FontWeight.Bold)
+			local valueLabel = makeLabel(row, formatNumber(value, step), 12, THEME.Accent, Enum.FontWeight.Bold)
 			valueLabel.Position = UDim2.new(1, -58, 0, 3)
 			valueLabel.Size = UDim2.fromOffset(46, 24)
 			valueLabel.TextXAlignment = Enum.TextXAlignment.Right
@@ -1328,6 +1440,7 @@ function Builder:CreateTab(name, icon)
 			fill.Size = UDim2.fromScale((value - min) / (max - min), 1)
 			fill.ZIndex = 17
 			fill.Parent = track
+			fill:SetAttribute("ThemeBg", "Accent")
 			corner(fill, 3)
 
 			local function setFromX(x)
@@ -1335,7 +1448,7 @@ function Builder:CreateTab(name, icon)
 				local rawValue = min + (max - min) * pct
 				value = math.clamp(math.floor((rawValue / step) + 0.5) * step, min, max)
 				pct = (value - min) / (max - min)
-				valueLabel.Text = tostring(value)
+				valueLabel.Text = formatNumber(value, step)
 				tween(fill, TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 					Size = UDim2.fromScale(pct, 1),
 				})
@@ -1368,7 +1481,7 @@ function Builder:CreateTab(name, icon)
 			return {
 				Set = function(nextValue)
 					value = math.clamp(math.floor((nextValue / step) + 0.5) * step, min, max)
-					valueLabel.Text = tostring(value)
+					valueLabel.Text = formatNumber(value, step)
 					tween(fill, TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 						Size = UDim2.fromScale((value - min) / (max - min), 1),
 					})
@@ -1408,6 +1521,7 @@ function Builder:CreateTab(name, icon)
 			btn.Parent = section
 			applyOrder(btn, order)
 			btn:SetAttribute("OpenBg", btn.BackgroundTransparency)
+			btn:SetAttribute("ThemeBg", "PanelLight")
 			corner(btn, 7)
 
 			local label = makeLabel(btn, text, 13, THEME.Text, Enum.FontWeight.Medium)
@@ -1427,6 +1541,7 @@ function Builder:CreateTab(name, icon)
 			menu.Size = UDim2.new(1, -24, 0, 0)
 			menu.ZIndex = 16
 			menu.Parent = btn
+			menu:SetAttribute("ThemeBg", "PanelLight")
 
 			local menuLayout = Instance.new("UIListLayout")
 			menuLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -1447,6 +1562,8 @@ function Builder:CreateTab(name, icon)
 				for option, optionButton in pairs(modeButtons) do
 					optionButton.BackgroundColor3 = option == mode and THEME.PanelHover or THEME.Panel
 					optionButton.TextColor3 = option == mode and THEME.Text or THEME.Muted
+					optionButton:SetAttribute("ThemeBg", option == mode and "PanelHover" or "Panel")
+					optionButton:SetAttribute("ThemeText", option == mode and "Text" or "Muted")
 				end
 				setMenuOpen(false)
 			end
@@ -1474,10 +1591,13 @@ function Builder:CreateTab(name, icon)
 				optionButton.TextSize = 12
 				optionButton.ZIndex = 17
 				optionButton.Parent = menu
+				optionButton:SetAttribute("ThemeBg", option == mode and "PanelHover" or "Panel")
+				optionButton:SetAttribute("ThemeText", option == "Clear" and "Bad" or (option == mode and "Text" or "Muted"))
 				corner(optionButton, 6)
 				if option ~= "Clear" then
 					modeButtons[option] = optionButton
 					optionButton.BackgroundColor3 = option == mode and THEME.PanelHover or THEME.Panel
+					optionButton:SetAttribute("ThemeBg", option == mode and "PanelHover" or "Panel")
 				end
 
 				optionButton.MouseButton1Click:Connect(function()
@@ -1580,6 +1700,7 @@ function Builder:CreateTab(name, icon)
 			row.Parent = section
 			applyOrder(row, order)
 			row:SetAttribute("OpenBg", row.BackgroundTransparency)
+			row:SetAttribute("ThemeBg", "PanelLight")
 			corner(row, 7)
 			padding(row, 12)
 
@@ -1617,6 +1738,7 @@ function Builder:CreateTab(name, icon)
 			row.Parent = section
 			applyOrder(row, order)
 			row:SetAttribute("OpenBg", row.BackgroundTransparency)
+			row:SetAttribute("ThemeBg", "PanelLight")
 			corner(row, 7)
 
 			local label = makeLabel(row, text, 13, THEME.Text, Enum.FontWeight.Medium)
@@ -1640,6 +1762,9 @@ function Builder:CreateTab(name, icon)
 			box.TextXAlignment = Enum.TextXAlignment.Left
 			box.ZIndex = 16
 			box.Parent = row
+			box:SetAttribute("ThemeBg", "Panel")
+			box:SetAttribute("ThemeText", "Text")
+			box:SetAttribute("ThemePlaceholder", "Muted")
 			corner(box, 6)
 			padding(box, 8)
 
@@ -1686,6 +1811,7 @@ function Builder:CreateTab(name, icon)
 			row.Parent = section
 			applyOrder(row, order)
 			row:SetAttribute("OpenBg", row.BackgroundTransparency)
+			row:SetAttribute("ThemeBg", "PanelLight")
 			corner(row, 7)
 
 			local label = makeLabel(row, text, 13, THEME.Text, Enum.FontWeight.Medium)
@@ -1707,6 +1833,8 @@ function Builder:CreateTab(name, icon)
 			button.TextXAlignment = Enum.TextXAlignment.Left
 			button.ZIndex = 16
 			button.Parent = row
+			button:SetAttribute("ThemeBg", "Panel")
+			button:SetAttribute("ThemeText", "Text")
 			corner(button, 6)
 			padding(button, 8)
 
@@ -1760,6 +1888,8 @@ function Builder:CreateTab(name, icon)
 					optionButton.TextSize = 12
 					optionButton.ZIndex = 17
 					optionButton.Parent = optionHolder
+					optionButton:SetAttribute("ThemeBg", "Panel")
+					optionButton:SetAttribute("ThemeText", "Muted")
 					corner(optionButton, 6)
 
 					optionButton.MouseButton1Click:Connect(function()
@@ -1813,6 +1943,7 @@ function Builder:CreateTab(name, icon)
 			row.Parent = section
 			applyOrder(row, order)
 			row:SetAttribute("OpenBg", row.BackgroundTransparency)
+			row:SetAttribute("ThemeBg", "PanelLight")
 			corner(row, 7)
 			padding(row, 12)
 
@@ -1860,6 +1991,8 @@ function Builder:CreateTab(name, icon)
 				itemButton.TextXAlignment = Enum.TextXAlignment.Left
 				itemButton.ZIndex = 17
 				itemButton.Parent = holder
+				itemButton:SetAttribute("ThemeBg", "Panel")
+				itemButton:SetAttribute("ThemeText", "Muted")
 				corner(itemButton, 6)
 				padding(itemButton, 10)
 
@@ -1917,6 +2050,7 @@ function Builder:CreateTab(name, icon)
 			row.Parent = section
 			applyOrder(row, order)
 			row:SetAttribute("OpenBg", row.BackgroundTransparency)
+			row:SetAttribute("ThemeBg", "PanelLight")
 			corner(row, 7)
 
 			local label = makeLabel(row, text, 13, THEME.Text, Enum.FontWeight.Medium)
