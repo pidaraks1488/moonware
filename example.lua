@@ -1,5 +1,23 @@
 -- load builder
 local Builder = loadstring(game:HttpGet("https://raw.githubusercontent.com/pidaraks1488/moonware/refs/heads/main/src/builder.lua"))()
+local UTILS_URL = "https://raw.githubusercontent.com/pidaraks1488/moonware/refs/heads/main/src/utils/"
+
+local function safeLoadUtil(name)
+	local ok, result = pcall(function()
+		return loadstring(game:HttpGet(UTILS_URL .. name .. ".lua"))()
+	end)
+	if ok then
+		return result
+	end
+	warn("Failed to load " .. name .. ":", result)
+	return nil
+end
+
+local Base64 = safeLoadUtil("base64")
+local XOR = safeLoadUtil("xor")
+local CacheUtil = safeLoadUtil("cacheutil")
+local Files = safeLoadUtil("files")
+local AI = safeLoadUtil("testaiutil")
 
 -- create window
 local window = Builder.new({
@@ -20,7 +38,17 @@ local window = Builder.new({
 	ConfirmYesText = "Yes",
 	ConfirmNoText = "No",
 	Width = 600,
-	Height = 360,
+	Height = 440,
+	SidebarWidth = 144,
+	TabHeight = 38,
+	TabGap = 8,
+	TabScrollEnabled = true,
+	MaxVisibleTabs = 6,
+	Config = {
+		Enabled = true,
+		Folder = "MoonwareExample",
+		File = "default.json",
+	},
 	Themes = {
 		Ocean = {
 			Background = Color3.fromRGB(13, 22, 30),
@@ -72,6 +100,7 @@ local main = window:CreateTab("Main", "lucide-home")
 local visuals = window:CreateTab("Visuals", "lucide-eye")
 local settings = window:CreateTab("Settings", "lucide-settings")
 local themes = window:CreateTab("Themes", "lucide-palette")
+local utils = window:CreateTab("Utils", "lucide-box")
 
 -- combat controls
 local combat = main:Section("Combat")
@@ -156,5 +185,91 @@ themeSection:Dropdown("Preset", window:GetThemes(), "Black", function(value)
 	window:SetTheme(value)
 	print("Theme:", value)
 end, 1)
+
+window:CreateConfigSection(settings, "Configs")
+
+-- utility examples
+local encodeSection = utils:Section("Encoding")
+local base64Preview = "base64.lua is not loaded"
+if Base64 then
+	local encoded = Base64.encode("Moonware")
+	local decoded = Base64.decode(encoded)
+	base64Preview = encoded .. " -> " .. tostring(decoded)
+end
+encodeSection:Paragraph("Base64", base64Preview, 1)
+
+local xorPreview = "xor.lua is not loaded"
+if XOR then
+	local encrypted = XOR.encryptHex("Moonware", "secret")
+	local decrypted = XOR.decryptHex(encrypted, "secret")
+	xorPreview = encrypted .. " -> " .. tostring(decrypted)
+end
+encodeSection:Paragraph("XOR", xorPreview, 2)
+
+local cacheSection = utils:Section("Cache")
+local cachePreview = "cacheutil.lua is not loaded"
+local rememberPreview = "cacheutil.lua is not loaded"
+if CacheUtil then
+	local cache = CacheUtil.new({
+		DefaultTtl = 10,
+		MaxSize = 20,
+	})
+	cache:set("username", "Moonware")
+	cachePreview = "username = " .. tostring(cache:get("username", "missing"))
+	local value = cache:remember("expensive", 10, function()
+		return "created once"
+	end)
+	rememberPreview = "expensive = " .. tostring(value)
+end
+cacheSection:Paragraph("Cache set/get", cachePreview, 1)
+cacheSection:Paragraph("Cache remember", rememberPreview, 2)
+
+local fileSection = utils:Section("Files")
+local filePreview = "files.lua is not loaded"
+local jsonPreview = "files.lua is not loaded"
+if Files then
+	local ok, err = Files.write("MoonwareExample/utils.txt", "hello from files.lua")
+	if ok then
+		local content = Files.read("MoonwareExample/utils.txt")
+		filePreview = "utils.txt = " .. tostring(content)
+	else
+		filePreview = "Write failed: " .. tostring(err)
+	end
+
+	local jsonOk, jsonErr = Files.writeJson("MoonwareExample/state.json", {
+		enabled = state.enabled,
+		mode = state.mode,
+		distance = state.distance,
+	})
+	if jsonOk then
+		local data = Files.readJson("MoonwareExample/state.json")
+		jsonPreview = "state.mode = " .. tostring(data and data.mode)
+	else
+		jsonPreview = "JSON write failed: " .. tostring(jsonErr)
+	end
+end
+fileSection:Paragraph("Write/read file", filePreview, 1)
+fileSection:Paragraph("JSON file", jsonPreview, 2)
+
+local aiSection = utils:Section("AI")
+local messagesPreview = "testaiutil.lua is not loaded"
+local extractPreview = "testaiutil.lua is not loaded"
+if AI then
+	local messages = AI.messages("Say hello", "You are Moonware AI")
+	messagesPreview = AI.toJson(messages) or "JSON encode failed"
+
+	local text = AI.extractText({
+		choices = {
+			{
+				message = {
+					content = "Hello from AI utility",
+				},
+			},
+		},
+	})
+	extractPreview = tostring(text)
+end
+aiSection:Paragraph("Messages", messagesPreview, 1)
+aiSection:Paragraph("Extract text", extractPreview, 2)
 
 return window
