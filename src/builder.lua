@@ -481,7 +481,9 @@ function Builder.new(config)
 	self.ConfirmMessage = config.ConfirmMessage or "Are you sure you want to unload this script?"
 	self.ConfirmYesText = config.ConfirmYesText or "Yes"
 	self.ConfirmNoText = config.ConfirmNoText or "No"
+	self.Title = (type(config.Title) == "string" and config.Title ~= "") and config.Title or "Untitled Moonware Script"
 	self.SidebarWidth = config.SidebarWidth or 144
+	self.SidebarHeight = config.SidebarHeight
 	self.TabHeight = config.TabHeight or 38
 	self.TabGap = config.TabGap or 8
 	self.TabScrollEnabled = config.TabScrollEnabled == true or config.TabScroll == true
@@ -490,7 +492,7 @@ function Builder.new(config)
 	self.Config = config.Config or {}
 	self.ConfigEnabled = self.Config.Enabled == true
 	self.ConfigFolder = self.Config.Folder or "Moonware"
-	self.ConfigFile = self.Config.File or ((config.Title or "Builder") .. ".json")
+	self.ConfigFile = self.Config.File or (self.Title .. ".json")
 	self.ThemePresets = {}
 	for name, theme in pairs(THEME_PRESETS) do
 		self.ThemePresets[name] = copyTheme(theme)
@@ -610,7 +612,7 @@ function Builder.new(config)
 	titleBar.Parent = root
 	padding(titleBar, 18)
 
-	local title = makeLabel(titleBar, config.Title or "Builder", 21, THEME.Text, Enum.FontWeight.Bold)
+	local title = makeLabel(titleBar, self.Title, 21, THEME.Text, Enum.FontWeight.Bold)
 	title.Position = UDim2.fromOffset(0, 0)
 	title.Size = UDim2.new(1, -76, 1, 0)
 	title.ZIndex = 13
@@ -632,7 +634,7 @@ function Builder.new(config)
 	sidebar.BackgroundTransparency = 0
 	sidebar.BorderSizePixel = 0
 	sidebar.Position = UDim2.fromOffset(18, 70)
-	sidebar.Size = UDim2.new(0, self.SidebarWidth, 1, -88)
+	sidebar.Size = self.SidebarHeight and UDim2.new(0, self.SidebarWidth, 0, self.SidebarHeight) or UDim2.new(0, self.SidebarWidth, 1, -88)
 	sidebar.ZIndex = 12
 	sidebar.Parent = root
 	sidebar:SetAttribute("ThemeBg", "Panel")
@@ -660,9 +662,6 @@ function Builder.new(config)
 	local function updateSidebarSize()
 		local contentHeight = tabList.AbsoluteContentSize.Y + 16
 		if self.TabScrollEnabled then
-			local visibleTabs = math.max(self.MaxVisibleTabs or #self.Tabs, 1)
-			local maxHeight = (visibleTabs * self.TabHeight) + (math.max(visibleTabs - 1, 0) * self.TabGap) + 16
-			sidebar.Size = UDim2.new(0, self.SidebarWidth, 0, math.min(contentHeight, maxHeight))
 			sidebar.CanvasSize = UDim2.fromOffset(0, contentHeight)
 		end
 	end
@@ -1928,10 +1927,20 @@ function Builder:CreateTab(name, icon)
 			bodyLabel.TextYAlignment = Enum.TextYAlignment.Top
 			bodyLabel.ZIndex = 16
 
+			local function refreshSize()
+				local height = math.max(66, bodyLabel.TextBounds.Y + 48)
+				row.Size = UDim2.new(1, 0, 0, height)
+				bodyLabel.Size = UDim2.new(1, 0, 0, height - 38)
+			end
+
+			bodyLabel:GetPropertyChangedSignal("TextBounds"):Connect(refreshSize)
+			task.defer(refreshSize)
+
 			return {
 				Set = function(nextTitle, nextBody)
 					titleLabel.Text = nextTitle or titleLabel.Text
 					bodyLabel.Text = nextBody or bodyLabel.Text
+					refreshSize()
 				end,
 			}
 		end
