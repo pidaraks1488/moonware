@@ -14,10 +14,20 @@ local function safeLoadUtil(name)
 end
 
 local Base64 = safeLoadUtil("base64")
+local UrlGuard = safeLoadUtil("urlguard")
+local Maid = safeLoadUtil("maid")
+local Runtime = safeLoadUtil("runtime")
+local StringUtil = safeLoadUtil("stringutil")
+local Clipboard = safeLoadUtil("clipboard")
+local TweenUtil = safeLoadUtil("tweenutil")
 local XOR = safeLoadUtil("xor")
 local CacheUtil = safeLoadUtil("cacheutil")
 local Files = safeLoadUtil("files")
 local AI = safeLoadUtil("testaiutil")
+
+local function valueLine(section, title, value, order)
+	section:Label(title .. ": " .. tostring(value), order)
+end
 
 -- create window
 local window = Builder.new({
@@ -31,7 +41,7 @@ local window = Builder.new({
 	ResponsiveMargin = 16,
 	MinScale = 0.58,
 	MaxScale = 1,
-	BlurSize = 4,
+	BlurSize = 0,
 	BackdropTransparency = 0.68,
 	ConfirmTitle = "Unload script?",
 	ConfirmMessage = "Are you sure you want to unload this script?",
@@ -168,7 +178,7 @@ ui:Dropdown("Tab animation", { "None", "Fade", "Slide", "Scale" }, "Fade", funct
 	print("Tab animation:", value)
 end, 2)
 
-ui:Slider("Blur", 0, 24, 4, 1, function(value)
+ui:Slider("Blur", 0, 24, 0, 1, function(value)
 	window.BlurSize = value
 	window.Blur.Size = value
 	print("Blur:", value)
@@ -196,15 +206,64 @@ if Base64 then
 	local decoded = Base64.decode(encoded)
 	base64Preview = encoded .. " -> " .. tostring(decoded)
 end
-encodeSection:Paragraph("Base64", base64Preview, 1)
+valueLine(encodeSection, "Base64", base64Preview, 1)
+
+local urlGuardPreview = "urlguard.lua is not loaded"
+if UrlGuard then
+	local encodedUrl = UrlGuard.encode("https://example.com/script.lua", "secret")
+	local decodedUrl = UrlGuard.decode(encodedUrl, "secret")
+	urlGuardPreview = StringUtil and (StringUtil.limit(encodedUrl, 18) .. " -> " .. StringUtil.limit(decodedUrl, 24)) or encodedUrl
+end
+valueLine(encodeSection, "URL Guard", urlGuardPreview, 2)
 
 local xorPreview = "xor.lua is not loaded"
 if XOR then
 	local encrypted = XOR.encryptHex("Moonware", "secret")
 	local decrypted = XOR.decryptHex(encrypted, "secret")
-	xorPreview = encrypted .. " -> " .. tostring(decrypted)
+	xorPreview = StringUtil and (StringUtil.limit(encrypted, 18) .. " -> " .. tostring(decrypted)) or (encrypted .. " -> " .. tostring(decrypted))
 end
-encodeSection:Paragraph("XOR", xorPreview, 2)
+valueLine(encodeSection, "XOR", xorPreview, 3)
+
+local helperSection = utils:Section("Helpers")
+
+local runtimePreview = "runtime.lua is not loaded"
+if Runtime then
+	local ok, value, attempts = Runtime.retry(2, 0, function()
+		return "ready"
+	end)
+	runtimePreview = tostring(ok) .. ", " .. tostring(value) .. ", attempts: " .. tostring(attempts)
+end
+valueLine(helperSection, "Runtime retry", runtimePreview, 1)
+
+local stringPreview = "stringutil.lua is not loaded"
+if StringUtil then
+	stringPreview = StringUtil.slug(" Moonware Utils Pack ") .. " / " .. StringUtil.limit("abcdefghijklmnopqrstuvwxyz", 10)
+end
+valueLine(helperSection, "Strings", stringPreview, 2)
+
+local maidPreview = "maid.lua is not loaded"
+if Maid then
+	local maid = Maid.new()
+	local cleaned = false
+	maid:Give(function()
+		cleaned = true
+	end)
+	maid:Cleanup()
+	maidPreview = "cleanup = " .. tostring(cleaned)
+end
+valueLine(helperSection, "Maid cleanup", maidPreview, 3)
+
+local clipboardPreview = "clipboard.lua is not loaded"
+if Clipboard then
+	clipboardPreview = Clipboard.isSupported() and "clipboard supported" or "clipboard not supported"
+end
+valueLine(helperSection, "Clipboard", clipboardPreview, 4)
+
+local tweenPreview = "tweenutil.lua is not loaded"
+if TweenUtil then
+	tweenPreview = "TweenUtil.play(instance, props, 0.2)"
+end
+valueLine(helperSection, "Tween", tweenPreview, 5)
 
 local cacheSection = utils:Section("Cache")
 local cachePreview = "cacheutil.lua is not loaded"
@@ -221,8 +280,8 @@ if CacheUtil then
 	end)
 	rememberPreview = "expensive = " .. tostring(value)
 end
-cacheSection:Paragraph("Cache set/get", cachePreview, 1)
-cacheSection:Paragraph("Cache remember", rememberPreview, 2)
+valueLine(cacheSection, "Cache set/get", cachePreview, 1)
+valueLine(cacheSection, "Cache remember", rememberPreview, 2)
 
 local fileSection = utils:Section("Files")
 local filePreview = "files.lua is not loaded"
@@ -248,8 +307,8 @@ if Files then
 		jsonPreview = "JSON write failed: " .. tostring(jsonErr)
 	end
 end
-fileSection:Paragraph("Write/read file", filePreview, 1)
-fileSection:Paragraph("JSON file", jsonPreview, 2)
+valueLine(fileSection, "Write/read file", filePreview, 1)
+valueLine(fileSection, "JSON file", jsonPreview, 2)
 
 local aiSection = utils:Section("AI")
 local messagesPreview = "testaiutil.lua is not loaded"
@@ -269,7 +328,7 @@ if AI then
 	})
 	extractPreview = tostring(text)
 end
-aiSection:Paragraph("Messages", messagesPreview, 1)
-aiSection:Paragraph("Extract text", extractPreview, 2)
+valueLine(aiSection, "Messages", messagesPreview, 1)
+valueLine(aiSection, "Extract text", extractPreview, 2)
 
 return window
