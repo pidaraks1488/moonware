@@ -104,12 +104,14 @@ local ICON_KEYS = {
 	Main = "lucide-home",
 	Visuals = "lucide-eye",
 	Settings = "lucide-settings",
+	Notification = "lucide-keyboard",
 }
 
 local FALLBACK_ICONS = {
 	["lucide-home"] = "rbxassetid://10723407389",
 	["lucide-eye"] = "rbxassetid://10723346959",
 	["lucide-settings"] = "rbxassetid://10734950309",
+	["lucide-keyboard"] = "rbxassetid://10723407389",
 }
 
 local ICONS = {}
@@ -199,6 +201,126 @@ local function resolveIcon(icon)
 		ICONS[icon] = parsed[icon]
 	end
 	return ICONS[icon] or FALLBACK_ICONS[icon]
+end
+
+local function formatKeyCode(key)
+	if typeof(key) ~= "EnumItem" then
+		return tostring(key or "Unknown")
+	end
+
+	local names = {
+		RightControl = "Right Ctrl",
+		LeftControl = "Left Ctrl",
+		RightShift = "Right Shift",
+		LeftShift = "Left Shift",
+		RightAlt = "Right Alt",
+		LeftAlt = "Left Alt",
+	}
+
+	return names[key.Name] or key.Name
+end
+
+local function makeMaskName(prefix)
+	local raw = HttpService:GenerateGUID(false):gsub("%-", "")
+	return (prefix or "CoreGui") .. "_" .. raw:sub(1, 10)
+end
+
+local function addCorner(parent, radius)
+	local ui = Instance.new("UICorner")
+	ui.CornerRadius = UDim.new(0, radius or 8)
+	ui.Parent = parent
+	return ui
+end
+
+local function sendMenuKeyNotification(parent, title, message, key, icon)
+	task.defer(function()
+		if not parent or not parent.Parent then
+			return
+		end
+
+		local toast = Instance.new("CanvasGroup")
+		toast.Name = makeMaskName("Layer")
+		toast.AnchorPoint = Vector2.new(1, 0)
+		toast.BackgroundColor3 = THEME.Panel
+		toast.BackgroundTransparency = 0.04
+		toast.BorderSizePixel = 0
+		toast.GroupTransparency = 1
+		toast.Position = UDim2.new(1, 330, 0, 18)
+		toast.Size = UDim2.fromOffset(304, 70)
+		toast.ZIndex = 200
+		toast.Parent = parent
+		addCorner(toast, 10)
+
+		local toastStroke = Instance.new("UIStroke")
+		toastStroke.Color = THEME.SoftStroke
+		toastStroke.Transparency = 0.18
+		toastStroke.Thickness = 1
+		toastStroke.Parent = toast
+
+		local iconHolder = Instance.new("Frame")
+		iconHolder.BackgroundColor3 = THEME.PanelLight
+		iconHolder.BorderSizePixel = 0
+		iconHolder.Position = UDim2.fromOffset(12, 14)
+		iconHolder.Size = UDim2.fromOffset(42, 42)
+		iconHolder.ZIndex = 201
+		iconHolder.Parent = toast
+		addCorner(iconHolder, 9)
+
+		local iconImage = Instance.new("ImageLabel")
+		iconImage.BackgroundTransparency = 1
+		iconImage.ImageColor3 = THEME.Accent
+		iconImage.Position = UDim2.fromOffset(10, 10)
+		iconImage.Size = UDim2.fromOffset(22, 22)
+		iconImage.ZIndex = 202
+		iconImage.Parent = iconHolder
+		local resolvedIcon = resolveIcon(icon)
+		if resolvedIcon then
+			iconImage.Image = resolvedIcon
+		end
+
+		local titleLabel = Instance.new("TextLabel")
+		titleLabel.BackgroundTransparency = 1
+		titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+		titleLabel.Position = UDim2.fromOffset(66, 13)
+		titleLabel.Size = UDim2.new(1, -82, 0, 22)
+		titleLabel.Text = title or "Menu ready"
+		titleLabel.TextColor3 = THEME.Text
+		titleLabel.TextSize = 14
+		titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
+		titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+		titleLabel.ZIndex = 201
+		titleLabel.Parent = toast
+
+		local bodyLabel = Instance.new("TextLabel")
+		bodyLabel.BackgroundTransparency = 1
+		bodyLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+		bodyLabel.Position = UDim2.fromOffset(66, 36)
+		bodyLabel.Size = UDim2.new(1, -82, 0, 20)
+		bodyLabel.Text = message or ("Open/close menu: " .. formatKeyCode(key))
+		bodyLabel.TextColor3 = THEME.Muted
+		bodyLabel.TextSize = 12
+		bodyLabel.TextTruncate = Enum.TextTruncate.AtEnd
+		bodyLabel.TextXAlignment = Enum.TextXAlignment.Left
+		bodyLabel.ZIndex = 201
+		bodyLabel.Parent = toast
+
+		tween(toast, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			GroupTransparency = 0,
+			Position = UDim2.new(1, -18, 0, 18),
+		})
+
+		task.wait(5)
+		if toast.Parent then
+			local out = tween(toast, TweenInfo.new(0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+				GroupTransparency = 1,
+				Position = UDim2.new(1, 330, 0, 18),
+			})
+			out.Completed:Wait()
+			if toast.Parent then
+				toast:Destroy()
+			end
+		end
+	end)
 end
 
 local function corner(parent, radius)
@@ -512,12 +634,15 @@ function Builder.new(config)
 			self.IconKeys[tabName] = iconKey
 		end
 	end
+	self.NotificationIcon = config.NotificationIcon or self.IconKeys.Notification or "lucide-keyboard"
+	self.IconKeys.Notification = self.NotificationIcon
 
 	ICONS = loadIconsFromSource(config.IconSource or ICON_SOURCE, self.IconKeys)
 
-	local old = PlayerGui:FindFirstChild("Builder")
-	if old then
-		old:Destroy()
+	for _, child in ipairs(PlayerGui:GetChildren()) do
+		if child:IsA("ScreenGui") and child:GetAttribute("MoonwareBuilder") == true then
+			child:Destroy()
+		end
 	end
 
 	local blur = Lighting:FindFirstChild("BuilderBlur") or Instance.new("BlurEffect")
@@ -527,7 +652,8 @@ function Builder.new(config)
 	self.Blur = blur
 
 	local gui = Instance.new("ScreenGui")
-	gui.Name = "Builder"
+	gui.Name = config.GuiName or makeMaskName(config.GuiNamePrefix or "RobloxGui")
+	gui:SetAttribute("MoonwareBuilder", true)
 	gui.IgnoreGuiInset = true
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -691,6 +817,9 @@ function Builder.new(config)
 	self:MakeDraggable(titleBar)
 	if config.Theme then
 		self:SetTheme(config.Theme)
+	end
+	if config.NotifyOnCreate ~= false then
+		sendMenuKeyNotification(self.Gui, config.NotificationTitle or self.Title, config.NotificationText, self.ToggleKey, self.NotificationIcon)
 	end
 	return self
 end
