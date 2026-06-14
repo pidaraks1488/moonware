@@ -304,14 +304,15 @@ local function sendMenuKeyNotification(parent, title, message, key, icon)
 		bodyLabel.ZIndex = 201
 		bodyLabel.Parent = toast
 
-		tween(toast, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+		local inTween = tween(toast, TweenInfo.new(0.42, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 			GroupTransparency = 0,
 			Position = UDim2.new(1, -18, 0, 18),
 		})
+		inTween.Completed:Wait()
 
 		task.wait(5)
 		if toast.Parent then
-			local out = tween(toast, TweenInfo.new(0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+			local out = tween(toast, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
 				GroupTransparency = 1,
 				Position = UDim2.new(1, 330, 0, 18),
 			})
@@ -585,7 +586,8 @@ function Builder.new(config)
 	self.Tabs = {}
 	self.CurrentTab = nil
 	self.ToggleKey = config.ToggleKey or Enum.KeyCode.RightControl
-	self.Open = true
+	self.Open = false
+	self.StartOpen = config.StartOpen ~= false
 	self.OpenAnimation = normalizeWindowAnimation(config.OpenAnimation or config.Animation or "Default", "Default")
 	self.CloseAnimation = normalizeWindowAnimation(config.CloseAnimation or config.Animation or "Default", "Default")
 	self.TabAnimation = normalizeTabAnimation(config.TabAnimation or "Fade", "Fade")
@@ -817,6 +819,24 @@ function Builder.new(config)
 	self:MakeDraggable(titleBar)
 	if config.Theme then
 		self:SetTheme(config.Theme)
+	end
+	self:ApplyResponsiveSize()
+	local initialSize = self.DisplaySize
+	local initialCompactSize = scaleUDim2(initialSize, 0.98)
+	self.Holder.Size = initialCompactSize
+	self.Root.Size = initialCompactSize
+	self.Root.GroupTransparency = 1
+	self.RootShadow.ImageTransparency = 1
+	self.Blur.Size = 0
+	if self.Backdrop then
+		self.Backdrop.BackgroundTransparency = 1
+		self.Backdrop.Visible = self.StartOpen
+	end
+	self.Holder.Visible = self.StartOpen
+	self.Root.Visible = self.StartOpen
+	self.RootShadow.Visible = self.StartOpen
+	if self.StartOpen then
+		self:SetOpen(true)
 	end
 	if config.NotifyOnCreate ~= false then
 		sendMenuKeyNotification(self.Gui, config.NotificationTitle or self.Title, config.NotificationText, self.ToggleKey, self.NotificationIcon)
