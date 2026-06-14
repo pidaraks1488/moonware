@@ -642,6 +642,9 @@ function Builder.new(config)
 	self.ResponsiveMargin = config.ResponsiveMargin or 16
 	self.MinScale = config.MinScale or 0.58
 	self.MaxScale = config.MaxScale or 1
+	self.MobileBreakpoint = config.MobileBreakpoint or 520
+	self.MobileMargin = config.MobileMargin or 10
+	self.MobileMinScale = config.MobileMinScale or 0.42
 	self.BlurSize = config.BlurSize or 4
 	self.BackdropTransparency = config.BackdropTransparency or 0.68
 	self.ConfirmTitle = config.ConfirmTitle or "Unload script?"
@@ -965,11 +968,10 @@ function Builder:ApplyResponsiveSize()
 		return
 	end
 
-	if self.Scale then
-		self.Scale.Scale = 1
-	end
-
 	if not self.Responsive then
+		if self.Scale then
+			self.Scale.Scale = 1
+		end
 		self.DisplaySize = self.Size
 		self.Holder.Size = self.DisplaySize
 		self.Root.Size = self.DisplaySize
@@ -977,12 +979,21 @@ function Builder:ApplyResponsiveSize()
 	end
 
 	local viewport = getViewportSize()
-	local margin = self.ResponsiveMargin or 16
+	local mobile = viewport.X <= (self.MobileBreakpoint or 520)
+	local margin = mobile and (self.MobileMargin or 10) or (self.ResponsiveMargin or 16)
 	local width = math.max(viewport.X * self.Size.X.Scale + self.Size.X.Offset, 1)
 	local height = math.max(viewport.Y * self.Size.Y.Scale + self.Size.Y.Offset, 1)
-	local scale = math.min((viewport.X - margin * 2) / width, (viewport.Y - margin * 2) / height, self.MaxScale or 1)
-	scale = math.clamp(scale, self.MinScale or 0.58, self.MaxScale or 1)
-	self.DisplaySize = UDim2.fromOffset(math.floor(width * scale + 0.5), math.floor(height * scale + 0.5))
+	local availableWidth = math.max(viewport.X - margin * 2, 220)
+	local availableHeight = math.max(viewport.Y - margin * 2, 220)
+	local maxScale = self.MaxScale or 1
+	local minScale = mobile and math.min(self.MinScale or 0.58, self.MobileMinScale or 0.42) or (self.MinScale or 0.58)
+	local fitScale = math.min(availableWidth / width, availableHeight / height, maxScale)
+	local effectiveMinScale = math.min(minScale, availableWidth / width, availableHeight / height)
+	local scale = math.clamp(fitScale, effectiveMinScale, maxScale)
+	if self.Scale then
+		self.Scale.Scale = scale
+	end
+	self.DisplaySize = UDim2.fromOffset(math.floor(width + 0.5), math.floor(height + 0.5))
 	self.Holder.Size = self.DisplaySize
 	self.Root.Size = self.DisplaySize
 end
